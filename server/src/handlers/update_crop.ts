@@ -1,23 +1,52 @@
+import { db } from '../db';
+import { cropsTable } from '../db/schema';
 import { type UpdateCropInput, type Crop } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function updateCrop(input: UpdateCropInput): Promise<Crop> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to update an existing crop in the database
-    // Should validate input data and update the specified crop record
+export const updateCrop = async (input: UpdateCropInput): Promise<Crop> => {
+  try {
+    // First check if the crop exists
+    const existingCrop = await db.select()
+      .from(cropsTable)
+      .where(eq(cropsTable.id, input.id))
+      .execute();
+
+    if (existingCrop.length === 0) {
+      throw new Error(`Crop with id ${input.id} not found`);
+    }
+
+    // Build update object with only the fields that are provided
+    const updateFields: any = {};
     
-    // Placeholder implementation - return a mock updated crop
+    if (input.name !== undefined) updateFields.name = input.name;
+    if (input.category !== undefined) updateFields.category = input.category;
+    if (input.icon !== undefined) updateFields.icon = input.icon;
+    if (input.estimated_cost !== undefined) updateFields.estimated_cost = input.estimated_cost.toString();
+    if (input.potential_profit !== undefined) updateFields.potential_profit = input.potential_profit.toString();
+    if (input.is_favorite !== undefined) updateFields.is_favorite = input.is_favorite;
+    if (input.is_stable !== undefined) updateFields.is_stable = input.is_stable;
+    if (input.is_public !== undefined) updateFields.is_public = input.is_public;
+    if (input.tooltip_info !== undefined) updateFields.tooltip_info = input.tooltip_info;
+    
+    // Always update the updated_at timestamp
+    updateFields.updated_at = new Date();
+
+    // Update the crop record
+    const result = await db.update(cropsTable)
+      .set(updateFields)
+      .where(eq(cropsTable.id, input.id))
+      .returning()
+      .execute();
+
+    // Convert numeric fields back to numbers before returning
+    const crop = result[0];
     return {
-        id: input.id,
-        name: input.name || 'Updated Crop',
-        category: input.category || 'Sayur',
-        icon: input.icon || '🌱',
-        estimated_cost: input.estimated_cost || 0,
-        potential_profit: input.potential_profit || 0,
-        is_favorite: input.is_favorite || false,
-        is_stable: input.is_stable || false,
-        is_public: input.is_public || false,
-        tooltip_info: input.tooltip_info || null,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as Crop;
-}
+      ...crop,
+      estimated_cost: parseFloat(crop.estimated_cost),
+      potential_profit: parseFloat(crop.potential_profit)
+    };
+  } catch (error) {
+    console.error('Crop update failed:', error);
+    throw error;
+  }
+};

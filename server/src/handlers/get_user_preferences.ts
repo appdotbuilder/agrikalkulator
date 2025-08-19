@@ -1,16 +1,33 @@
+import { db } from '../db';
+import { userPreferencesTable } from '../db/schema';
 import { type UserPreferences } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function getUserPreferences(userId: number): Promise<UserPreferences> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch user preferences from the database
-    // Should return user's theme preference and favorite crops list
+export const getUserPreferences = async (userId: number): Promise<UserPreferences> => {
+  try {
+    // Query user preferences from database
+    const result = await db.select()
+      .from(userPreferencesTable)
+      .where(eq(userPreferencesTable.user_id, userId))
+      .execute();
+
+    if (result.length === 0) {
+      throw new Error(`User preferences not found for user ID: ${userId}`);
+    }
+
+    const preferences = result[0];
     
+    // Parse the favorite_crops JSON string back to array
+    const favoriteCrops = preferences.favorite_crops 
+      ? JSON.parse(preferences.favorite_crops) 
+      : [];
+
     return {
-        id: 1,
-        user_id: userId,
-        theme: 'light',
-        favorite_crops: [],
-        created_at: new Date(),
-        updated_at: new Date()
+      ...preferences,
+      favorite_crops: favoriteCrops
     };
-}
+  } catch (error) {
+    console.error('Failed to fetch user preferences:', error);
+    throw error;
+  }
+};
